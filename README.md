@@ -2,9 +2,9 @@
 
 TODO 驱动的全自动深度研究助手，使用 LangChain + FastAPI + Vue 3 构建。
 
-![1](images\1.png)
-![2](images\2.png)
-![2](images\3.png)
+![图片](./images/1.png)
+![图片](./images/2.png)
+![图片](./images/3.png)
 
 ## 功能特点
 
