@@ -2,11 +2,9 @@
 
 TODO 驱动的全自动深度研究助手，使用 LangChain + FastAPI + Vue 3 构建。
 
-![image-20260410153818462](C:\Users\29354\AppData\Roaming\Typora\typora-user-images\image-20260410153818462.png)
-
-![PixPin_2026-04-10_15-34-24](C:\Users\29354\Desktop\PixPin_2026-04-10_15-34-24.png)
-
-![image-20260410154225715](C:\Users\29354\AppData\Roaming\Typora\typora-user-images\image-20260410154225715.png)
+![1](images\1.png)
+![2](images\2.png)
+![2](images\3.png)
 
 ## 功能特点
 
