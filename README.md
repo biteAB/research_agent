@@ -57,8 +57,8 @@ research_agent/
 ### 1. 创建 Conda 环境
 
 ```bash
-conda create -n deepresearch python=3.10
-conda activate deepresearch
+conda create -n research python=3.10
+conda activate research
 ```
 
 ### 2. 安装后端依赖
@@ -77,20 +77,16 @@ npm install
 
 ### 4. 配置环境变量
 
-复制 `.env.example` 到 `.env` 并填写你的 API Key:
-
-```bash
-cp .env.example .env
-```
+创建 `.env` 文件并填写你的 API Key:
 
 编辑 `.env`:
 
 ```env
-# LLM - 需要 OpenAI API Key（或兼容 OpenAI 格式的接口）
-OPENAI_API_KEY=your_openai_api_key_here
-OPENAI_MODEL_NAME=gpt-4o
-# 如果使用第三方代理，设置 BASE URL
-# OPENAI_BASE_URL=https://api.openai.com/v1
+# LLM 
+填写你的llm信息
+LLM_API_KEY = xxx
+LLM_MODEL_ID = xxx
+LLM_BASE_URL = xxx
 
 # 搜索 - 推荐使用 Tavily
 TAVILY_API_KEY=your_tavily_api_key_here
@@ -132,34 +128,10 @@ npm run dev
    - 最后生成完整的 Markdown 报告
 4. 研究完成后，可以查看完整报告
 
-## API 接口
-
-- `POST /api/research/start` - 开始研究，返回 `{ task_id: uuid }`
-- `GET /api/research/stream/{task_id}` - SSE 实时进度推送
-
-## SSE 事件类型
-
-| 事件类型       | 说明                 |
-|----------------|----------------------|
-| `planning`     | 规划完成，返回 TODO 列表 |
-| `searching`    | 正在搜索某个子任务 |
-| `summarizing`  | 正在总结某个子任务 |
-| `summary_done` | 子任务总结完成 |
-| `reporting`    | 开始生成报告 |
-| `report_chunk` | 报告流式片段 |
-| `done`         | 全部完成 |
-| `error`        | 出错信息 |
 
 ## 技术栈
 
-- **后端**: Python 3.10+, LangChain, FastAPI, asyncio
+- **后端**: Python 3.10+, LangChain, FastAPI
 - **前端**: Vue 3, TypeScript, Vite, marked.js
 - **搜索引擎**: Tavily / DuckDuckGo
-- **LLM**: OpenAI GPT-4o（推荐，也兼容其他 OpenAI 格式模型）
-
-## 注意事项
-
-- 如果使用 DuckDuckGo，请不要频繁请求，否则会被限流
-- 推荐使用 Tavily，搜索结果质量更高，专门为 AI 搜索设计
-- 所有 LLM 调用都是异步的，支持并发搜索
-- 搜索结果有缓存，重复查询会直接使用缓存结果
+- **LLM**: doubaoSeed（推荐，也兼容其他 OpenAI 格式模型）
