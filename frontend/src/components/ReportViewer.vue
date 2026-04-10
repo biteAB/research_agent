@@ -1,6 +1,13 @@
 <template>
   <div class="report-viewer">
-    <h3>研究报告</h3>
+    <div class="report-header">
+      <h3>研究报告</h3>
+      <div v-if="report" class="download-buttons">
+        <button class="btn-download btn-markdown" @click="downloadMarkdown">
+          📝 下载 Markdown
+        </button>
+      </div>
+    </div>
     <div
       v-if="report"
       class="report-content"
@@ -29,11 +36,59 @@ const props = defineProps<Props>()
 const renderedReport = computed(() => {
   return marked.parse(props.report)
 })
+
+const downloadMarkdown = () => {
+  const blob = new Blob([props.report], { type: 'text/markdown' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `research-report-${new Date().toISOString().slice(0, 10)}.md`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
 </script>
 
 <style scoped>
 .report-viewer {
   margin-top: 24px;
+}
+
+.report-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.report-header h3 {
+  font-size: 1.2rem;
+  margin: 0;
+  color: #333;
+}
+
+.download-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-download {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-markdown {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.btn-markdown:hover {
+  background: #e0e0e0;
 }
 
 h3 {

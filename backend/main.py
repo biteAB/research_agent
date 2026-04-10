@@ -116,36 +116,69 @@ async def stream_research(task_id: str):
             task.plan = plan
             yield _format_sse_event("planning", {"todos": [t.model_dump() for t in plan.todos]})
 
-            # Step 2: Search and summarize each task
-            for todo in plan.todos:
+            # Step 2: Search and summarize all tasks in parallel
+            # Create a queue for passing events from parallel tasks
+            event_queue: asyncio.Queue[str] = asyncio.Queue()
+
+            async def process_single_task(todo):
                 # Search
-                task.status = f"searching:{todo.id}"
-                yield _format_sse_event("searching", {
+                await event_queue.put(_format_sse_event("searching", {
                     "task_id": todo.id,
                     "task_title": todo.title
-                })
+                }))
+                task.status = f"searching:{todo.id}"
 
                 search_results = await search_service.search_task(todo)
 
                 # Summarize
-                task.status = f"summarizing:{todo.id}"
-                yield _format_sse_event("summarizing", {
+                await event_queue.put(_format_sse_event("summarizing", {
                     "task_id": todo.id,
                     "task_title": todo.title
-                })
+                }))
+                task.status = f"summarizing:{todo.id}"
 
                 summary, error = await summarization_service.summarize_task(todo, search_results)
                 if error is not None:
-                    task.status = "error"
-                    task.error = error
-                    yield _format_sse_event("error", {"message": error})
-                    return
+                    await event_queue.put(_format_sse_event("error", {"message": error}))
+                    return None
 
-                task.summaries.append(summary)
-                yield _format_sse_event("summary_done", summary.model_dump())
-
-                # Small delay to make the progress visible
+                await event_queue.put(_format_sse_event("summary_done", summary.model_dump()))
                 await asyncio.sleep(0.1)
+                return summary
+
+            # Start all tasks concurrently
+            processing_tasks = [process_single_task(todo) for todo in plan.todos]
+
+            # Create a wrapper that puts all tasks and signals when done
+            async def run_all_tasks():
+                results = await asyncio.gather(*processing_tasks)
+                # Signal consumer we're done by putting a sentinel
+                await event_queue.put(None)  # None = done
+                # Check for errors
+                for result in results:
+                    if result is None:
+                        return False
+                # Collect all summaries
+                task.summaries = [r for r in results if r is not None]
+                return True
+
+            # Start processor in background
+            processor_task = asyncio.create_task(run_all_tasks())
+
+            # Consume events from queue until we get the sentinel None
+            while True:
+                event = await event_queue.get()
+                if event is None:
+                    # All done
+                    event_queue.task_done()
+                    break
+                yield event
+                event_queue.task_done()
+
+            # Wait for processor to complete and check for success
+            success = await processor_task
+            if not success:
+                return
 
             # Step 3: Generate final report with streaming
             task.status = "reporting"

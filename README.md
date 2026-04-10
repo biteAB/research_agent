@@ -2,6 +2,12 @@
 
 TODO 驱动的全自动深度研究助手，使用 LangChain + FastAPI + Vue 3 构建。
 
+![image-20260410153818462](C:\Users\29354\AppData\Roaming\Typora\typora-user-images\image-20260410153818462.png)
+
+![PixPin_2026-04-10_15-34-24](C:\Users\29354\Desktop\PixPin_2026-04-10_15-34-24.png)
+
+![image-20260410154225715](C:\Users\29354\AppData\Roaming\Typora\typora-user-images\image-20260410154225715.png)
+
 ## 功能特点
 
 - **三 Agent 协作架构**: 规划 → 搜索 → 总结 → 报告自动生成
@@ -135,3 +141,9 @@ npm run dev
 - **前端**: Vue 3, TypeScript, Vite, marked.js
 - **搜索引擎**: Tavily / DuckDuckGo
 - **LLM**: doubaoSeed（推荐，也兼容其他 OpenAI 格式模型）
+
+## 后续优化点
+
+- 实现持久化保存聊天记录。
+- 支持报告下载为PDF文件
+- 扩展更多的搜索引擎

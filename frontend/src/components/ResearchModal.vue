@@ -1,43 +1,46 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @click.self="handleClose">
-    <div class="modal-content">
-      <div class="modal-header">
+  <div v-if="visible" class="fullscreen-page">
+    <div class="page-header">
+      <div class="header-title">
         <h2>正在深度研究</h2>
-        <button class="close-btn" @click="handleClose" :disabled="isRunning">
-          ×
-        </button>
+        <div v-if="currentTaskTitle" class="current-status">
+          <span class="status-indicator" :class="currentStatus"></span>
+          <span>{{ getStatusText() }}</span>
+        </div>
       </div>
+      <button class="close-btn" @click="handleClose" :disabled="isRunning">
+        ← 返回首页
+      </button>
+    </div>
 
-      <div class="current-status" v-if="currentTaskTitle">
-        <span class="status-indicator" :class="currentStatus"></span>
-        <span>{{ getStatusText() }}</span>
-      </div>
-
-      <div class="modal-body">
-        <TodoList
-          :todos="todos"
-          :get-task-status="getTaskStatus"
-        />
-
-        <ReportViewer
-          :report="report"
-          :is-generating="currentStatus === 'reporting'"
-        />
-      </div>
-
+    <div class="page-body">
       <div v-if="error" class="error-box">
         <strong>错误:</strong> {{ error }}
       </div>
 
-      <div class="modal-footer" v-if="currentStatus === 'done'">
-        <button class="btn-primary" @click="handleClose">完成</button>
+      <TodoList
+        :todos="todos"
+        :expanded-task-id="expandedTaskId"
+        :get-task-status="getTaskStatus"
+        :get-task-summary="getTaskSummary"
+        @toggle-expand="handleToggleExpand"
+      />
+
+      <ReportViewer
+        :report="report"
+        :is-generating="currentStatus === 'reporting'"
+      />
+
+      <div v-if="currentStatus === 'done'" class="page-footer">
+        <button class="btn-primary" @click="handleClose">完成并返回</button>
       </div>
     </div>
   </div>
+  <div v-else class="empty-placeholder"></div>
 </template>
 
 <script setup lang="ts">
-import type { TodoTask, TaskStatus } from '../composables/useResearch'
+import type { TodoTask, TaskStatus, TaskSummary } from '../composables/useResearch'
 import TodoList from './TodoList.vue'
 import ReportViewer from './ReportViewer.vue'
 
@@ -46,16 +49,24 @@ interface Props {
   isRunning: boolean
   currentStatus: TaskStatus
   currentTaskTitle: string
+  expandedTaskId: string | null
   todos: TodoTask[]
   report: string
   error: string | null
   getTaskStatus: (taskId: string) => TaskStatus
+  getTaskSummary: (taskId: string) => TaskSummary | undefined
+  onToggleExpand: (taskId: string) => void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   close: []
+  toggleExpand: [taskId: string]
 }>()
+
+const handleToggleExpand = (taskId: string) => {
+  emit('toggleExpand', taskId)
+}
 
 const statusTextMap: Record<TaskStatus, string> = {
   pending: '准备中...',
@@ -81,18 +92,16 @@ const handleClose = () => {
 </script>
 
 <style scoped>
-.modal-overlay {
+.fullscreen-page {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: #f5f5f5;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   z-index: 1000;
-  padding: 20px;
   animation: fadeIn 0.2s ease;
 }
 
@@ -101,72 +110,33 @@ const handleClose = () => {
   to { opacity: 1; }
 }
 
-.modal-content {
+.page-header {
   background: white;
-  border-radius: 16px;
-  width: 100%;
-  max-width: 900px;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  animation: slideUp 0.3s ease;
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.modal-header {
+  border-bottom: 1px solid #eee;
+  padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
-  border-bottom: 1px solid #eee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
-.modal-header h2 {
+.header-title {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.page-header h2 {
   margin: 0;
   font-size: 1.4rem;
   color: #2c3e50;
 }
 
-.close-btn {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: none;
-  font-size: 2rem;
-  color: #999;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0;
-  border-radius: 4px;
-}
-
-.close-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  color: #333;
-}
-
-.close-btn:disabled {
-  cursor: not-allowed;
-}
-
 .current-status {
-  padding: 12px 24px;
-  background: #f8f9fa;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: #495057;
 }
 
@@ -199,20 +169,48 @@ const handleClose = () => {
   50% { opacity: 0.5; }
 }
 
-.modal-body {
+.close-btn {
+  padding: 8px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.close-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  color: #333;
+  border-color: #ccc;
+}
+
+.close-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-body {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .error-box {
   padding: 12px 24px;
   background: #f8d7da;
   color: #721c24;
+  border-radius: 8px;
+  margin-bottom: 16px;
 }
 
-.modal-footer {
-  padding: 16px 24px;
+.page-footer {
+  margin-top: 24px;
+  padding-top: 16px;
   border-top: 1px solid #eee;
   text-align: right;
 }
@@ -229,5 +227,9 @@ const handleClose = () => {
 
 .btn-primary:hover {
   background: #359469;
+}
+
+.empty-placeholder {
+  display: none;
 }
 </style>

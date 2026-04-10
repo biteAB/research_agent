@@ -9,11 +9,14 @@
       :is-running="isRunning"
       :current-status="currentStatus"
       :current-task-title="currentTaskTitle"
+      :expanded-task-id="expandedTaskId"
       :todos="todos"
       :report="report"
       :error="error"
       :get-task-status="getTaskStatus"
+      :get-task-summary="getTaskSummary"
       @close="handleClose"
+      @toggle-expand="handleToggleExpand"
     />
   </div>
 </template>
@@ -26,6 +29,7 @@ import ResearchModal from './components/ResearchModal.vue'
 const {
   isRunning,
   currentStatus,
+  expandedTaskId,
   currentTaskTitle,
   todos,
   report,
@@ -33,6 +37,8 @@ const {
   startResearch,
   reset,
   getTaskStatus,
+  getTaskSummary,
+  toggleTaskExpand,
 } = useResearch()
 
 const handleStartSearch = async (topic: string) => {
@@ -41,6 +47,10 @@ const handleStartSearch = async (topic: string) => {
 
 const handleClose = () => {
   reset()
+}
+
+const handleToggleExpand = (taskId: string) => {
+  toggleTaskExpand(taskId)
 }
 </script>
 

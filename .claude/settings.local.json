@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import sys; sys.path.insert\\(0, '.'\\); from backend.main import app; print\\('Syntax OK'\\)\")",
+      "Bash(npx tsc:*)",
+      "Bash(python -c \"import sys; sys.path.insert\\(0, 'g:/research_agent'\\); from backend.main import app; print\\('✅ Syntax OK'\\)\")"
+    ]
+  }
+}
