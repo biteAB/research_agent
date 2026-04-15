@@ -34,6 +34,10 @@ export function useResearch() {
   const todos = ref<TodoTask[]>([])
   const summaries = ref<TaskSummary[]>([])
   const report = ref('')
+  const reportId = ref<string | null>(null)
+  const isIndexed = ref(false)
+  const isIndexing = ref(false)
+  const indexError = ref<string | null>(null)
   const error = ref<string | null>(null)
   const eventSource = ref<EventSource | null>(null)
 
@@ -60,6 +64,10 @@ export function useResearch() {
       todos.value = []
       summaries.value = []
       report.value = ''
+      reportId.value = null
+      isIndexed.value = false
+      isIndexing.value = false
+      indexError.value = null
       error.value = null
 
       // Connect SSE
@@ -138,8 +146,15 @@ export function useResearch() {
         report.value += event.data.chunk
         break
 
+      case 'report_saved':
+        reportId.value = event.data.report_id
+        isIndexed.value = event.data.indexed === true
+        break
+
       case 'done':
         report.value = event.data.report
+        reportId.value = event.data.report_id
+        isIndexed.value = event.data.indexed === true
         currentStatus.value = 'done'
         isRunning.value = false
         stopResearch()
@@ -184,6 +199,33 @@ export function useResearch() {
     isRunning.value = false
   }
 
+  const confirmIndex = async () => {
+    if (!reportId.value) {
+      indexError.value = '报告尚未保存，无法入库'
+      return
+    }
+
+    isIndexing.value = true
+    indexError.value = null
+
+    try {
+      const response = await fetch(`/api/reports/${reportId.value}/confirm-index`, {
+        method: 'POST',
+      })
+      const data = await response.json()
+
+      if (data.error) {
+        throw new Error(data.error)
+      }
+
+      isIndexed.value = true
+    } catch (e) {
+      indexError.value = e instanceof Error ? e.message : '入库失败'
+    } finally {
+      isIndexing.value = false
+    }
+  }
+
   const reset = () => {
     stopResearch()
     taskId.value = null
@@ -196,6 +238,10 @@ export function useResearch() {
     todos.value = []
     summaries.value = []
     report.value = ''
+    reportId.value = null
+    isIndexed.value = false
+    isIndexing.value = false
+    indexError.value = null
     error.value = null
   }
 
@@ -209,9 +255,14 @@ export function useResearch() {
     todos,
     summaries,
     report,
+    reportId,
+    isIndexed,
+    isIndexing,
+    indexError,
     error,
     startResearch,
     stopResearch,
+    confirmIndex,
     reset,
     getTaskStatus,
     getTaskSummary,

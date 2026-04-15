@@ -8,6 +8,9 @@ openai
 pydantic-settings
 tavily-python
 python-multipart
+pymilvus
+sentence-transformers
+torch
 # uvloop and httptools are optional and not supported on Windows
 # uvloop
 # httptools

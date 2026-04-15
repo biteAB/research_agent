@@ -32,6 +32,18 @@
       />
 
       <div v-if="currentStatus === 'done'" class="page-footer">
+        <div class="index-actions">
+          <button
+            class="btn-primary"
+            :disabled="!reportId || isIndexed || isIndexing"
+            @click="handleConfirmIndex"
+          >
+            {{ isIndexed ? '已入库' : isIndexing ? '正在入库...' : '确认入库' }}
+          </button>
+          <span v-if="isIndexed" class="success-text">这份报告已进入本地知识库</span>
+          <span v-else-if="!reportId" class="muted-text">报告保存后可入库</span>
+          <span v-if="indexError" class="error-text">{{ indexError }}</span>
+        </div>
         <button class="btn-primary" @click="handleClose">完成并返回</button>
       </div>
     </div>
@@ -52,16 +64,20 @@ interface Props {
   expandedTaskId: string | null
   todos: TodoTask[]
   report: string
+  reportId: string | null
+  isIndexed: boolean
+  isIndexing: boolean
+  indexError: string | null
   error: string | null
   getTaskStatus: (taskId: string) => TaskStatus
   getTaskSummary: (taskId: string) => TaskSummary | undefined
-  onToggleExpand: (taskId: string) => void
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   close: []
   toggleExpand: [taskId: string]
+  confirmIndex: []
 }>()
 
 const handleToggleExpand = (taskId: string) => {
@@ -88,6 +104,10 @@ const getStatusText = (): string => {
 
 const handleClose = () => {
   emit('close')
+}
+
+const handleConfirmIndex = () => {
+  emit('confirmIndex')
 }
 </script>
 
@@ -212,7 +232,18 @@ const handleClose = () => {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid #eee;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.index-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .btn-primary {
@@ -227,6 +258,26 @@ const handleClose = () => {
 
 .btn-primary:hover {
   background: #359469;
+}
+
+.btn-primary:disabled {
+  background: #a5d9c2;
+  cursor: not-allowed;
+}
+
+.success-text {
+  color: #2f7d32;
+  font-size: 0.9rem;
+}
+
+.muted-text {
+  color: #777;
+  font-size: 0.9rem;
+}
+
+.error-text {
+  color: #b3261e;
+  font-size: 0.9rem;
 }
 
 .empty-placeholder {

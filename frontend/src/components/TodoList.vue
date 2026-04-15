@@ -79,7 +79,6 @@ interface Props {
   expandedTaskId: string | null
   getTaskStatus: (taskId: string) => TaskStatus
   getTaskSummary: (taskId: string) => TaskSummary | undefined
-  onToggleExpand: (taskId: string) => void
 }
 
 const props = defineProps<Props>()

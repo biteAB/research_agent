@@ -1,5 +1,4 @@
 """Configuration settings for the research agent system."""
-import os
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -31,6 +30,22 @@ class Settings(BaseSettings):
     # Agent Configuration
     MAX_RETRIES: int = 2
     ENABLE_SEARCH_CACHE: bool = True
+
+    # Local knowledge base and RAG configuration
+    DATA_DIR: str = "backend/data"
+    PENDING_REPORT_DIR: str = "backend/data/pending_reports"
+    KNOWLEDGE_BASE_DIR: str = "backend/data/markdown"
+
+    MILVUS_HOST: str = "localhost"
+    MILVUS_PORT: int = 19530
+    MILVUS_COLLECTION: str = "research_agent_chunks"
+
+    EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-zh-v1.5"
+    EMBEDDING_DIM: int = 512
+
+    RAG_CHUNK_SIZE: int = 800
+    RAG_CHUNK_OVERLAP: int = 120
+    RAG_TOP_K: int = 5
 
     # Get the effective API key (prefer LLM_API_KEY if set)
     def get_effective_api_key(self) -> Optional[str]:

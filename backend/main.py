@@ -1,6 +1,7 @@
 """FastAPI entry point for the deep research agent."""
 import sys
 import os
+import logging
 
 # Add the project root directory to Python path
 # This allows running from any directory
@@ -11,8 +12,9 @@ if project_root not in sys.path:
 import asyncio
 import uuid
 import json
+from pathlib import Path
 from typing import Dict, Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -29,6 +31,12 @@ from backend.services.planning_service import get_planning_service
 from backend.services.search_service import get_search_service
 from backend.services.summarization_service import get_summarization_service
 from backend.services.reporting_service import get_reporting_service
+from backend.services.report_storage_service import get_report_storage_service
+from backend.rag.indexer import RagIndexer
+from backend.rag.qa_service import RagQAService
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(title="Deep Research Agent", version="1.0.0")
@@ -52,6 +60,9 @@ planning_service = get_planning_service()
 search_service = get_search_service()
 summarization_service = get_summarization_service()
 reporting_service = get_reporting_service()
+report_storage_service = get_report_storage_service()
+rag_indexer = RagIndexer()
+rag_qa_service = RagQAService()
 
 
 class StartResearchRequest(BaseModel):
@@ -190,10 +201,26 @@ async def stream_research(task_id: str):
                 yield _format_sse_event("report_chunk", {"chunk": chunk})
 
             full_report = "".join(report_chunks)
+            pending_report = await report_storage_service.save_pending_report(
+                report_id=task.task_id,
+                topic=task.topic,
+                markdown=full_report,
+            )
+            yield _format_sse_event("report_saved", {
+                "report_id": pending_report.report_id,
+                "pending_path": pending_report.pending_path,
+                "indexed": False,
+            })
+
             task.status = "done"
-            yield _format_sse_event("done", {"report": full_report})
+            yield _format_sse_event("done", {
+                "report": full_report,
+                "report_id": pending_report.report_id,
+                "indexed": False,
+            })
 
         except Exception as e:
+            logger.exception("Research stream failed")
             task.status = "error"
             task.error = str(e)
             yield _format_sse_event("error", {"message": str(e)})
@@ -212,6 +239,66 @@ async def stream_research(task_id: str):
 async def get_research_status(task_id: str) -> Optional[ResearchTask]:
     """Get the current status of a research task."""
     return research_tasks.get(task_id)
+
+
+@app.post("/api/reports/{report_id}/confirm-index")
+async def confirm_report_index(report_id: str):
+    """Confirm a generated report and index it into the local RAG knowledge base."""
+    try:
+        result = await report_storage_service.confirm_and_index_report(report_id)
+        return result.model_dump()
+    except Exception as e:
+        logger.exception("Confirm index failed: report_id=%s", report_id)
+        return {"error": str(e)}
+
+
+@app.post("/api/rag/index")
+async def index_knowledge_base():
+    """Index all confirmed Markdown files in the local knowledge base directory."""
+    try:
+        result = await asyncio.to_thread(
+            rag_indexer.index_directory,
+            Path(settings.KNOWLEDGE_BASE_DIR),
+        )
+        return result
+    except Exception as e:
+        logger.exception("Knowledge base indexing failed")
+        return {"error": str(e)}
+
+
+@app.get("/api/rag/search")
+async def rag_search(question: str = Query(..., min_length=1)):
+    """Return raw vector search results for debugging the local RAG retrieval step."""
+    try:
+        results = rag_qa_service.search(question)
+        return {"results": [result.model_dump() for result in results]}
+    except Exception as e:
+        logger.exception("RAG search failed")
+        return {"error": str(e)}
+
+
+@app.get("/api/rag/chat/stream")
+async def rag_chat_stream(question: str = Query(..., min_length=1)):
+    """SSE endpoint for streaming RAG answers."""
+
+    async def event_generator():
+        try:
+            yield _format_sse_event("status", {"message": "正在检索本地知识库..."})
+            async for chunk in rag_qa_service.stream_answer(question):
+                yield _format_sse_event("answer_chunk", {"chunk": chunk})
+            yield _format_sse_event("done", {})
+        except Exception as e:
+            logger.exception("RAG chat failed")
+            yield _format_sse_event("error", {"message": str(e)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 if __name__ == "__main__":

@@ -21,10 +21,9 @@ import { ref } from 'vue'
 
 interface Props {
   disabled: boolean
-  onSearch: (topic: string) => void
 }
 
-const props = withDefaults(defineProps<Props>(), {})
+defineProps<Props>()
 const emit = defineEmits<{
   search: [topic: string]
 }>()
