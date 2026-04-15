@@ -118,7 +118,9 @@ const handleConfirmIndex = () => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: #f5f5f5;
+  background:
+    radial-gradient(circle at top left, rgba(47, 125, 50, 0.08), transparent 30rem),
+    linear-gradient(180deg, #f8fbf8 0%, #eef4f0 100%);
   display: flex;
   flex-direction: column;
   z-index: 1000;
@@ -131,13 +133,14 @@ const handleConfirmIndex = () => {
 }
 
 .page-header {
-  background: white;
-  border-bottom: 1px solid #eee;
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid #dce8df;
   padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 8px 24px rgba(31, 49, 38, 0.06);
+  backdrop-filter: blur(14px);
 }
 
 .header-title {
@@ -149,7 +152,7 @@ const handleConfirmIndex = () => {
 .page-header h2 {
   margin: 0;
   font-size: 1.4rem;
-  color: #2c3e50;
+  color: #18211d;
 }
 
 .current-status {
@@ -157,7 +160,7 @@ const handleConfirmIndex = () => {
   align-items: center;
   gap: 8px;
   font-size: 0.9rem;
-  color: #495057;
+  color: #58655f;
 }
 
 .status-indicator {
@@ -195,15 +198,15 @@ const handleConfirmIndex = () => {
   background: white;
   border-radius: 8px;
   font-size: 0.9rem;
-  color: #666;
+  color: #34433b;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
 
 .close-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  color: #333;
-  border-color: #ccc;
+  background: #f1f6f2;
+  color: #26332d;
+  border-color: #b9c9c0;
 }
 
 .close-btn:disabled {
@@ -221,17 +224,20 @@ const handleConfirmIndex = () => {
 }
 
 .error-box {
-  padding: 12px 24px;
-  background: #f8d7da;
-  color: #721c24;
+  padding: 12px 16px;
+  background: #fff1f0;
+  color: #b3261e;
+  border: 1px solid #ffd4d0;
   border-radius: 8px;
   margin-bottom: 16px;
 }
 
 .page-footer {
   margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
+  padding: 16px;
+  border: 1px solid #dce8df;
+  border-radius: 8px;
+  background: white;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -248,7 +254,7 @@ const handleConfirmIndex = () => {
 
 .btn-primary {
   padding: 10px 24px;
-  background: #42b983;
+  background: #2f7d32;
   color: white;
   border: none;
   border-radius: 8px;
@@ -257,7 +263,7 @@ const handleConfirmIndex = () => {
 }
 
 .btn-primary:hover {
-  background: #359469;
+  background: #256c2a;
 }
 
 .btn-primary:disabled {
@@ -267,11 +273,12 @@ const handleConfirmIndex = () => {
 
 .success-text {
   color: #2f7d32;
+  font-weight: 700;
   font-size: 0.9rem;
 }
 
 .muted-text {
-  color: #777;
+  color: #64736b;
   font-size: 0.9rem;
 }
 

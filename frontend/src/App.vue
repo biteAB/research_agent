@@ -78,6 +78,6 @@ const handleToggleExpand = (taskId: string) => {
 <style scoped>
 .app {
   min-height: 100vh;
-  background: #f5f5f5;
+  background: transparent;
 }
 </style>

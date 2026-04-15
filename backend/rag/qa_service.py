@@ -7,9 +7,9 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 
 from backend.config import settings
-from backend.rag.embeddings import BgeEmbeddingService
-from backend.rag.milvus_store import MilvusVectorStore
+from backend.rag.hybrid_retriever import HybridRetriever
 from backend.rag.prompts import RAG_HUMAN_PROMPT, RAG_SYSTEM_PROMPT
+from backend.rag.schemas import RagSearchHit, RetrievalTrace
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +18,14 @@ class RagQAService:
     """Retrieve local chunks and stream an LLM answer."""
 
     def __init__(self):
-        self.embeddings: BgeEmbeddingService | None = None
-        self.store: MilvusVectorStore | None = None
+        self.retriever: HybridRetriever | None = None
         self.llm: ChatOpenAI | None = None
         self.chain = None
 
-    def _get_embeddings(self) -> BgeEmbeddingService:
-        if self.embeddings is None:
-            self.embeddings = BgeEmbeddingService()
-        return self.embeddings
-
-    def _get_store(self) -> MilvusVectorStore:
-        if self.store is None:
-            self.store = MilvusVectorStore()
-        return self.store
+    def _get_retriever(self) -> HybridRetriever:
+        if self.retriever is None:
+            self.retriever = HybridRetriever()
+        return self.retriever
 
     def _get_chain(self):
         if self.chain is None:
@@ -51,31 +45,54 @@ class RagQAService:
             self.chain = prompt | self.llm
         return self.chain
 
-    def _format_context(self, results) -> str:
+    def _format_context(self, results: list[RagSearchHit]) -> str:
         if not results:
             return "未检索到相关本地知识库内容。"
 
         parts = []
         for i, item in enumerate(results, 1):
             parts.append(
-                f"[{i}] 文档: {item.document_title}\n"
-                f"章节: {item.section_title}\n"
+                f"[{i}] 文档ID: {item.doc_id}\n"
+                f"领域: {item.domain}\n"
                 f"类型: {item.chunk_type}\n"
-                f"来源: {item.source_name}\n"
-                f"相关度: {item.score:.4f}\n"
+                f"检索分数: {item.score:.4f}\n"
                 f"内容:\n{item.content}"
             )
         return "\n\n".join(parts)
 
-    def search(self, question: str):
-        """Search local knowledge chunks for a question."""
-        query_embedding = self._get_embeddings().embed_query(question)
-        return self._get_store().search(query_embedding, settings.RAG_TOP_K)
+    def search(
+        self,
+        question: str,
+        *,
+        doc_id: str | None = None,
+        domain: str | None = None,
+        include_references: bool | None = None,
+    ) -> RetrievalTrace:
+        """Return a full retrieval trace for debugging."""
+        return self._get_retriever().retrieve(
+            question,
+            doc_id=doc_id,
+            domain=domain,
+            include_references=include_references,
+        )
 
-    async def stream_answer(self, question: str) -> AsyncIterator[str]:
+    async def stream_answer(
+        self,
+        question: str,
+        *,
+        doc_id: str | None = None,
+        domain: str | None = None,
+        include_references: bool | None = None,
+    ) -> AsyncIterator[str]:
         logger.info("RAG question received: %s", question)
-        results = await asyncio.to_thread(self.search, question)
-        context = self._format_context(results)
+        trace = await asyncio.to_thread(
+            self.search,
+            question,
+            doc_id=doc_id,
+            domain=domain,
+            include_references=include_references,
+        )
+        context = self._format_context(trace.selected_context)
 
         async for chunk in self._get_chain().astream(
             {

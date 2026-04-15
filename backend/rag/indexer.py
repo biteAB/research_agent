@@ -4,6 +4,7 @@ from pathlib import Path
 
 from backend.rag.embeddings import BgeEmbeddingService
 from backend.rag.markdown_loader import MarkdownLoader
+from backend.rag.metadata_extractor import MetadataExtractor
 from backend.rag.milvus_store import MilvusVectorStore
 from backend.rag.text_splitter import BasicTextSplitter
 
@@ -16,6 +17,7 @@ class RagIndexer:
     def __init__(self):
         self.loader = MarkdownLoader()
         self.splitter = BasicTextSplitter()
+        self.metadata_extractor = MetadataExtractor()
         self.embeddings: BgeEmbeddingService | None = None
         self.store: MilvusVectorStore | None = None
 
@@ -38,10 +40,12 @@ class RagIndexer:
             logger.warning("No chunks generated for file: %s", path)
             return {"indexed_files": 1, "indexed_chunks": 0}
 
+        domain = self.metadata_extractor.extract_domain(doc.document_title, doc.content)
+        chunks = [chunk.model_copy(update={"domain": domain}) for chunk in chunks]
         vectors = self._get_embeddings().embed_documents([chunk.content for chunk in chunks])
         inserted = self._get_store().insert_chunks(chunks, vectors)
-        logger.info("Indexed file=%s chunks=%d", path, inserted)
-        return {"indexed_files": 1, "indexed_chunks": inserted}
+        logger.info("Indexed file=%s domain=%s chunks=%d", path, domain, inserted)
+        return {"indexed_files": 1, "indexed_chunks": inserted, "domain": domain}
 
     def index_directory(self, directory: Path) -> dict:
         logger.info("Indexing markdown directory: %s", directory)
@@ -52,6 +56,8 @@ class RagIndexer:
             chunks = self.splitter.split_document(doc)
             if not chunks:
                 continue
+            domain = self.metadata_extractor.extract_domain(doc.document_title, doc.content)
+            chunks = [chunk.model_copy(update={"domain": domain}) for chunk in chunks]
             vectors = self._get_embeddings().embed_documents([chunk.content for chunk in chunks])
             total_chunks += self._get_store().insert_chunks(chunks, vectors)
 

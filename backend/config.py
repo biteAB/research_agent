@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     MILVUS_HOST: str = "localhost"
     MILVUS_PORT: int = 19530
-    MILVUS_COLLECTION: str = "research_agent_chunks"
+    MILVUS_COLLECTION: str = "research_agent_chunks_v2"
 
     EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-zh-v1.5"
     EMBEDDING_DIM: int = 512
@@ -46,6 +46,18 @@ class Settings(BaseSettings):
     RAG_CHUNK_SIZE: int = 800
     RAG_CHUNK_OVERLAP: int = 120
     RAG_TOP_K: int = 5
+    RAG_MAX_SECTION_CHARS: int = 1800
+
+    DENSE_TOP_K: int = 20
+    SPARSE_TOP_K: int = 20
+    HYBRID_TOP_K: int = 8
+    RERANK_TOP_K: int = 5
+    RRF_K: int = 60
+
+    RERANK_MODEL_NAME: str = "BAAI/bge-reranker-base"
+    ENABLE_RERANK: bool = False
+    ENABLE_QUERY_REWRITE: bool = True
+    ENABLE_SPARSE_SEARCH: bool = True
 
     # Get the effective API key (prefer LLM_API_KEY if set)
     def get_effective_api_key(self) -> Optional[str]:

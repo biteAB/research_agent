@@ -121,26 +121,28 @@ const handleClick = (taskId: string) => {
 h3 {
   font-size: 1.2rem;
   margin-bottom: 16px;
-  color: #333;
+  color: #26332d;
 }
 
 .tasks {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .task-item {
-  background: #f8f9fa;
+  background: white;
   border-radius: 8px;
-  border-left: 4px solid #ddd;
-  transition: all 0.2s;
+  border: 1px solid #dce8df;
+  border-left: 4px solid #cfdcd4;
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
   cursor: pointer;
   overflow: hidden;
 }
 
 .task-item:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 12px 26px rgba(31, 49, 38, 0.08);
+  transform: translateY(-1px);
 }
 
 .task-item.pending {
@@ -149,26 +151,30 @@ h3 {
 }
 
 .task-item.searching {
-  background: #fff3cd;
-  border-left-color: #ffc107;
+  background: #fff9e8;
+  border-color: #f1d693;
+  border-left-color: #d69b16;
   opacity: 1;
 }
 
 .task-item.summarizing {
-  background: #cce5ff;
-  border-left-color: #007bff;
+  background: #edf6ef;
+  border-color: #cde4d1;
+  border-left-color: #2f7d32;
   opacity: 1;
 }
 
 .task-item.done {
-  background: #d4edda;
-  border-left-color: #28a745;
+  background: #f7faf8;
+  border-color: #cde4d1;
+  border-left-color: #2f7d32;
   opacity: 1;
 }
 
 .task-item.error {
-  background: #f8d7da;
-  border-left-color: #dc3545;
+  background: #fff1f0;
+  border-color: #ffd4d0;
+  border-left-color: #b3261e;
   opacity: 1;
 }
 
@@ -184,25 +190,25 @@ h3 {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: #ddd;
+  background: #cfdcd4;
 }
 
 .task-item.searching .status-dot {
-  background: #ffc107;
+  background: #d69b16;
   animation: pulse 1.5s infinite;
 }
 
 .task-item.summarizing .status-dot {
-  background: #007bff;
+  background: #2f7d32;
   animation: pulse 1.5s infinite;
 }
 
 .task-item.done .status-dot {
-  background: #28a745;
+  background: #2f7d32;
 }
 
 .task-item.error .status-dot {
-  background: #dc3545;
+  background: #b3261e;
 }
 
 @keyframes pulse {
@@ -216,19 +222,19 @@ h3 {
 
 .task-title {
   font-weight: 600;
-  color: #333;
+  color: #26332d;
   margin-bottom: 4px;
 }
 
 .task-intent {
   font-size: 0.85rem;
-  color: #666;
+  color: #64736b;
 }
 
 .task-status-label {
   font-size: 0.8rem;
-  color: #666;
-  font-weight: 500;
+  color: #58655f;
+  font-weight: 700;
 }
 
 .expand-icon {
@@ -252,7 +258,7 @@ h3 {
 .task-details {
   border-top: 1px solid rgba(0, 0, 0, 0.1);
   padding: 16px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
   animation: slideDown 0.2s ease-out;
 }
 
@@ -277,14 +283,14 @@ h3 {
 
 .detail-section h4 {
   font-size: 0.9rem;
-  color: #555;
+  color: #34433b;
   margin-bottom: 8px;
   font-weight: 600;
 }
 
 .detail-section p {
   margin: 0;
-  color: #444;
+  color: #34433b;
   line-height: 1.6;
 }
 
@@ -297,14 +303,14 @@ h3 {
 .query-tag {
   font-size: 0.8rem;
   padding: 4px 10px;
-  background: #e9ecef;
+  background: #eef7f0;
   border-radius: 4px;
-  color: #495057;
+  color: #2f5f3b;
 }
 
 .summary-content {
   line-height: 1.6;
-  color: #444;
+  color: #34433b;
   white-space: pre-wrap;
 }
 
@@ -316,7 +322,7 @@ h3 {
 
 .key-points li {
   margin-bottom: 4px;
-  color: #444;
+  color: #34433b;
 }
 
 .sources {
@@ -326,7 +332,7 @@ h3 {
 }
 
 .sources a {
-  color: #007bff;
+  color: #236c31;
   text-decoration: none;
 }
 
@@ -340,7 +346,7 @@ h3 {
 }
 
 .loading {
-  color: #666;
+  color: #64736b;
   animation: pulse 1.5s infinite;
 }
 </style>

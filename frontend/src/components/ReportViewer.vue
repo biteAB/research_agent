@@ -4,7 +4,7 @@
       <h3>研究报告</h3>
       <div v-if="report" class="download-buttons">
         <button class="btn-download btn-markdown" @click="downloadMarkdown">
-          📝 下载 Markdown
+          下载 Markdown
         </button>
       </div>
     </div>
@@ -65,7 +65,7 @@ const downloadMarkdown = () => {
 .report-header h3 {
   font-size: 1.2rem;
   margin: 0;
-  color: #333;
+  color: #26332d;
 }
 
 .download-buttons {
@@ -74,50 +74,55 @@ const downloadMarkdown = () => {
 }
 
 .btn-download {
-  padding: 8px 16px;
-  border: none;
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 1px solid #cfdcd4;
   border-radius: 6px;
   font-size: 0.85rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s, border-color 0.2s;
 }
 
 .btn-markdown {
-  background: #f0f0f0;
-  color: #333;
+  background: white;
+  color: #34433b;
 }
 
 .btn-markdown:hover {
-  background: #e0e0e0;
+  background: #f1f6f2;
+  border-color: #b9c9c0;
 }
 
 h3 {
   font-size: 1.2rem;
   margin-bottom: 16px;
-  color: #333;
+  color: #26332d;
 }
 
 .report-content {
   background: white;
   padding: 24px;
   border-radius: 8px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #dce8df;
   max-height: 500px;
   overflow-y: auto;
   line-height: 1.7;
+  box-shadow: 0 12px 30px rgba(31, 49, 38, 0.06);
 }
 
 .report-content :deep(h1) {
   font-size: 1.8rem;
   margin-bottom: 1rem;
-  border-bottom: 2px solid #eee;
+  color: #18211d;
+  border-bottom: 2px solid #e3eee6;
   padding-bottom: 0.5rem;
 }
 
 .report-content :deep(h2) {
   font-size: 1.4rem;
   margin: 1.5rem 0 1rem;
-  color: #2c3e50;
+  color: #26332d;
 }
 
 .report-content :deep(h3) {
@@ -139,7 +144,8 @@ h3 {
 }
 
 .report-content :deep(a) {
-  color: #42b983;
+  color: #236c31;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -148,33 +154,40 @@ h3 {
 }
 
 .report-content :deep(pre) {
-  background: #f5f5f5;
+  background: #17231d;
+  color: #eef7f0;
   padding: 1rem;
-  border-radius: 4px;
+  border-radius: 8px;
   overflow-x: auto;
   margin: 1rem 0;
 }
 
 .report-content :deep(code) {
-  background: #f5f5f5;
+  background: #eaf0ed;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   font-size: 0.9em;
 }
 
+.report-content :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
 .report-content :deep(blockquote) {
-  border-left: 4px solid #ddd;
+  border-left: 4px solid #86b98f;
   padding-left: 1rem;
-  color: #666;
+  color: #44524b;
   margin: 1rem 0;
 }
 
 .placeholder {
-  background: #f8f9fa;
+  background: white;
   padding: 48px;
   border-radius: 8px;
   text-align: center;
-  color: #666;
-  border: 2px dashed #ddd;
+  color: #64736b;
+  border: 1px dashed #b9c9c0;
 }
 </style>
