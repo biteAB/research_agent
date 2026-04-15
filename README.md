@@ -1,64 +1,206 @@
-# 自动化深度研究智能体系统
+# 自动化深度研究Agent + 本地知识库RAG系统
 
-TODO 驱动的全自动深度研究助手，使用 LangChain + FastAPI + Vue 3 构建。
+这是一个面向中文资料研究的多Agent项目。系统支持从用户输入主题开始，自动规划研究任务、检索外部资料、总结信息并生成 Markdown报告；报告生成后不会立即进入知识库，而是先进入待确认区，只有用户在前端点击“确认入库”后，才会写入本地Markdown 知识库并增量索引到Milvus，供RAG问答检索使用。
 
+```text
+用户输入研究主题
+  -> Agent 检索与生成 Markdown 报告
+  -> 保存为待确认报告
+  -> 用户前端确认入库
+  -> 写入 backend/data/markdown
+  -> Markdown 结构化切分
+  -> dense embedding + Milvus BM25 sparse
+  -> Hybrid 检索 + 可选 Rerank
+  -> RAG 页面流式回答
+```
 ![图片](./images/1.png)
 ![图片](./images/2.png)
 ![图片](./images/3.png)
+![图片](./images/3.png)
+## 核心功能
 
-## 功能特点
+- 多Agent深度研究：规划、搜索、总结、报告生成。
+- SSE流式输出：研究进度、最终报告、RAG回答均支持前端实时展示。
+- 用户确认入库：Agent生成的报告先进入待确认目录，用户确认后才进入知识库。
+- 本地Markdown 知识库：已确认报告保存到 `backend/data/markdown/`。
+- Milvus RAG：使用本地Docker部署的Milvus存储dense/sparse向量。
+- Markdown 结构化分块：按一级标题、二级标题、参考来源章节切分。
+- Hybrid检索：dense语义召回 + Milvus内置BM25 sparse召回 + RRF融合。
+- 元数据过滤：当前支持 `doc_id`、`chunk_type`、`domain`。
+- 检索调试日志：每次检索会输出命中信息。
+- Markdown渲染：研究报告和 RAG 回答均支持 Markdown渲染。
+- 不持久化聊天记录：RAG聊天内容只保存在前端内存中，刷新即清空。
 
-- **三 Agent 协作架构**: 规划 → 搜索 → 总结 → 报告自动生成
-- **实时进度推送**: 通过 SSE 推送实时进度到前端
-- **多种搜索引擎**: 支持 Tavily（推荐）和 DuckDuckGo（免费无密钥）
-- **流式报告生成**: 最终报告支持流式输出，逐步显示
-- **中文优化**: 所有 Agent Prompt 和输出都是中文
+## 技术栈
+
+后端：
+
+- Python 3.10+
+- FastAPI
+- LangChain / langchain-openai
+- Tavily 或 DuckDuckGo 搜索
+- pymilvus
+- sentence-transformers
+- torch
+
+前端：
+
+- Vue 3
+- TypeScript
+- Vite
+- marked.js
+
+向量数据库：
+
+- Milvus本地Docker
+- Collection：`research_agent_chunks_v2`
+- Dense embedding：`BAAI/bge-small-zh-v1.5`
+- Sparse/BM25：优先使用 Milvus 内置 BM25 / Function 能力
 
 ## 项目结构
 
-```
+```text
 research_agent/
 ├── backend/
-│   ├── main.py                  # FastAPI 入口
 │   ├── agents/
-│   │   ├── planner.py           # TODO 规划 Agent
-│   │   ├── summarizer.py        # 任务总结 Agent
-│   │   └── reporter.py          # 报告撰写 Agent
+│   │   ├── planner.py                 # 研究任务规划 Agent
+│   │   ├── summarizer.py              # 子任务总结 Agent
+│   │   └── reporter.py                # Markdown 报告生成 Agent
 │   ├── services/
 │   │   ├── planning_service.py
 │   │   ├── search_service.py
 │   │   ├── summarization_service.py
-│   │   └── reporting_service.py
+│   │   ├── reporting_service.py
+│   │   └── report_storage_service.py  # 待确认报告保存、确认入库
 │   ├── tools/
-│   │   └── search_tool.py       # 搜索工具封装
-│   ├── schemas.py               # Pydantic 数据模型
-│   └── config.py                # 配置
+│   │   └── search_tool.py             # Tavily / DuckDuckGo 搜索封装
+│   ├── rag/
+│   │   ├── schemas.py                 # RAG 数据模型
+│   │   ├── markdown_loader.py         # Markdown 加载
+│   │   ├── text_splitter.py           # Markdown 结构化切分
+│   │   ├── metadata_extractor.py      # domain 元数据提取
+│   │   ├── embeddings.py              # BGE embedding
+│   │   ├── milvus_store.py            # Milvus collection / insert / search
+│   │   ├── query_analyzer.py          # 查询分析、改写、过滤条件生成
+│   │   ├── hybrid_retriever.py        # dense + sparse + RRF 融合检索
+│   │   ├── reranker.py                # 可选 rerank
+│   │   ├── retrieval_trace.py         # 检索链路日志和调试输出
+│   │   ├── indexer.py                 # 文件/目录索引入口
+│   │   ├── qa_service.py              # RAG 问答服务
+│   │   └── prompts.py                 # RAG Prompt
+│   ├── data/
+│   │   ├── pending_reports/           # Agent 生成后待确认的报告
+│   │   └── markdown/                  # 用户确认入库后的知识库 Markdown
+│   ├── schemas.py
+│   └── config.py
 ├── frontend/
 │   ├── src/
 │   │   ├── App.vue
 │   │   ├── components/
+│   │   │   ├── AppNav.vue
 │   │   │   ├── SearchBox.vue
 │   │   │   ├── ResearchModal.vue
 │   │   │   ├── TodoList.vue
-│   │   │   └── ReportViewer.vue
-│   │   └── composables/
-│   │       └── useResearch.ts   # SSE 逻辑封装
+│   │   │   ├── ReportViewer.vue
+│   │   │   └── RagChat.vue
+│   │   ├── composables/
+│   │   │   ├── useResearch.ts
+│   │   │   └── useRagChat.ts
+│   │   ├── main.ts
+│   │   └── style.css
 │   └── package.json
-├── .env.example
-└── requirements.txt
+├── images/
+├── requirements.txt
+├── .env
+└── README.md
 ```
 
-## 架构说明
+## RAG 数据设计
 
-### 三个 Agent 协作
+当前Milvus collection名称：
 
-1. **TODO Planner**: 将用户研究主题分解为 3~5 个子任务，输出 JSON
-2. **Task Summarizer**: 接收单个子任务的搜索结果，生成结构化摘要（JSON）
-3. **Report Writer**: 整合所有摘要，流式输出最终 Markdown 报告
+```text
+research_agent_chunks_v2
+```
+
+Schema：
+
+```text
+chunk_uid      VARCHAR primary key
+doc_id         VARCHAR
+chunk_type     VARCHAR      # title / section / reference
+domain         VARCHAR      # 技术 / 金融 / 医疗 / 教育 / 政策 / 产品 / 其他
+content        VARCHAR
+dense_vector   FLOAT_VECTOR dim=512
+sparse_vector  SPARSE_FLOAT_VECTOR
+```
+
+说明：
+
+- `chunk_uid`：chunk唯一 ID。
+- `doc_id`：文档归属ID，后续可用于按文档过滤。
+- `chunk_type`：区分标题块、正文块、参考来源块。
+- `domain`：主题领域，用于基础元数据过滤。
+- `content`：保留原始chunk文本，便于调试、引用展示和BM25 sparse检索。
+- `dense_vector`：BGE向量，用于语义召回。
+- `sparse_vector`：Milvus内置BM25 sparse向量，用于关键词召回。
+
+## Agent与知识库入库流程
+
+1. 用户在前端输入研究主题。
+2. 后端启动研究任务，通过SSE推送规划、搜索、总结、报告生成状态。
+3. Agent生成Markdown报告。
+4. 报告保存到：
+
+```text
+backend/data/pending_reports/
+```
+
+5. 前端展示“确认入库”按钮。
+6. 用户确认后，报告复制到：
+
+```text
+backend/data/markdown/
+```
+
+7. `RagIndexer`加载该Markdown，结构化切分、提取domain、生成dense embedding，并写入Milvus。
+8. RAG问答页面即可检索该报告内容。
+
+也就是说：没有经过用户确认入库的报告，不会进入Milvus向量数据库。
+
+## RAG 检索流程
+
+```text
+用户提问
+  -> QueryAnalyzer 分析查询
+  -> 生成 rewritten_query / expanded_queries / domain / include_references
+  -> 构造 Milvus filter expr
+  -> dense search
+  -> sparse BM25 search
+  -> RRF 融合
+  -> 可选 rerank
+  -> 拼接上下文
+  -> 大模型流式生成回答
+```
+
+默认配置：
+
+```text
+DENSE_TOP_K=20
+SPARSE_TOP_K=20
+HYBRID_TOP_K=8
+RERANK_TOP_K=5
+RRF_K=60
+ENABLE_RERANK=False
+ENABLE_QUERY_REWRITE=True
+ENABLE_SPARSE_SEARCH=True
+```
+
+`ENABLE_RERANK` 默认关闭，因为 `BAAI/bge-reranker-base` 首次加载会下载较大的模型文件。需要更高检索质量时，可以手动开启。
 
 ## 环境准备
 
-### 1. 创建 Conda 环境
+### 1. 创建 Python 环境
 
 ```bash
 conda create -n research python=3.10
@@ -79,69 +221,120 @@ cd frontend
 npm install
 ```
 
-### 4. 配置环境变量
+### 4. 启动 Milvus
 
-创建 `.env` 文件并填写你的 API Key:
+项目要求本地已经通过Docker部署 Milvus，并开放默认端口：
 
-编辑 `.env`:
-
-```env
-# LLM 
-填写你的llm信息
-LLM_API_KEY = xxx
-LLM_MODEL_ID = xxx
-LLM_BASE_URL = xxx
-
-# 搜索 - 推荐使用 Tavily
-TAVILY_API_KEY=your_tavily_api_key_here
-SEARCH_ENGINE=tavily
-
-# 如果没有 Tavily API Key，可以用 DuckDuckGo（免费但有限制）
-# SEARCH_ENGINE=duckduckgo
+```text
+localhost:19530
 ```
 
-> 获取 Tavily API Key: https://tavily.com/
+如果你的Milvus地址不同，请在 `.env` 中修改：
 
-## 启动服务
+```env
+MILVUS_HOST=localhost
+MILVUS_PORT=19530
+MILVUS_COLLECTION=research_agent_chunks_v2
+```
 
-### 1. 启动后端
+### 5. 配置环境变量
+
+在项目根目录创建 `.env`：
+
+```env
+# LLM，兼容 OpenAI 格式接口
+LLM_API_KEY=your_llm_api_key
+LLM_MODEL_ID=your_model_id
+LLM_BASE_URL=your_base_url
+
+# 搜索引擎
+TAVILY_API_KEY=your_tavily_api_key
+SEARCH_ENGINE=tavily
+
+# 如果不使用 Tavily，可切换为 DuckDuckGo
+# SEARCH_ENGINE=duckduckgo
+
+# Milvus
+MILVUS_HOST=localhost
+MILVUS_PORT=19530
+MILVUS_COLLECTION=research_agent_chunks_v2
+
+# Embedding
+EMBEDDING_MODEL_NAME=BAAI/bge-small-zh-v1.5
+EMBEDDING_DIM=512
+
+# RAG
+ENABLE_SPARSE_SEARCH=True
+ENABLE_QUERY_REWRITE=True
+ENABLE_RERANK=False
+```
+
+## 启动项目
+
+### 后端
+
+请先确认FastAPI入口文件存在。旧版项目使用：
 
 ```bash
 cd research_agent/backend
 python main.py
 ```
 
-后端将在 `http://localhost:8000` 启动。
+也可以使用类似命令：
 
-### 2. 启动前端（另开终端）
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+后端默认地址：
+
+```text
+http://localhost:8000
+```
+
+### 前端
 
 ```bash
 cd research_agent/frontend
 npm run dev
 ```
 
-前端将在 `http://localhost:5173` 启动，打开浏览器访问即可使用。
+前端默认地址：
 
-## 使用流程
+```text
+http://localhost:5173
+```
 
-1. 在首页输入你的研究主题（例如：`LangChain 框架最新发展趋势`）
-2. 点击「开始研究」
-3. 在弹出窗口中查看实时进度：
-   - 首先 AI 会制定研究计划（分解为子任务）
-   - 然后逐个对子任务进行搜索和总结
-   - 最后生成完整的 Markdown 报告
-4. 研究完成后，可以查看完整报告
+## 日志与调试
 
+RAG 检索会输出较详细日志，便于排查召回质量：
 
-## 技术栈
+```text
+trace_id
+original_query
+rewritten_query
+expanded_queries
+filter_expr
+dense_hits
+sparse_hits
+fused_hits
+reranked_hits
+selected_context
+```
 
-- **后端**: Python 3.10+, LangChain, FastAPI
-- **前端**: Vue 3, TypeScript, Vite, marked.js
-- **搜索引擎**: Tavily / DuckDuckGo
-- **LLM**: doubaoSeed（推荐，也兼容其他 OpenAI 格式模型）
+如果 RAG 回答不符合预期，建议优先查看：
 
-## 后续优化点
+1. `/api/rag/search` 返回的 `dense_hits` 和 `sparse_hits`。
+2. `filter_expr` 是否因为 `domain` 或 `chunk_type` 过滤过严。
+3. Milvus collection是否为 `research_agent_chunks_v2`。
+4. 已确认入库的 Markdown 是否存在于 `backend/data/markdown/`。
 
-- 实现持久化保存聊天记录。
-- 支持报告下载为PDF文件
-- 扩展更多的搜索引擎
+## 后续迭代方向
+
+- 知识库文档列表与删除/重建索引。
+- 更细粒度的metadata filter。
+- 检索结果引用来源展示。
+- 查询改写和多轮检索增强。
+- Rerank默认可配置化与模型缓存说明。
+- RAG 聊天记录持久化。
+
