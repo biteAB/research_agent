@@ -16,7 +16,7 @@
 ![图片](./images/1.png)
 ![图片](./images/2.png)
 ![图片](./images/3.png)
-![图片](./images/3.png)
+![图片](./images/4.png)
 ## 核心功能
 
 - 多Agent深度研究：规划、搜索、总结、报告生成。
