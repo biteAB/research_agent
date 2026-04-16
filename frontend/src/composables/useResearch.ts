@@ -146,14 +146,9 @@ export function useResearch() {
         report.value += event.data.chunk
         break
 
-      case 'report_saved':
-        reportId.value = event.data.report_id
-        isIndexed.value = event.data.indexed === true
-        break
-
       case 'done':
         report.value = event.data.report
-        reportId.value = event.data.report_id
+        reportId.value = event.data.task_id
         isIndexed.value = event.data.indexed === true
         currentStatus.value = 'done'
         isRunning.value = false
@@ -200,7 +195,7 @@ export function useResearch() {
   }
 
   const confirmIndex = async () => {
-    if (!reportId.value) {
+    if (!taskId.value) {
       indexError.value = '报告尚未保存，无法入库'
       return
     }
@@ -209,7 +204,7 @@ export function useResearch() {
     indexError.value = null
 
     try {
-      const response = await fetch(`/api/reports/${reportId.value}/confirm-index`, {
+      const response = await fetch(`/api/research/${taskId.value}/index-report`, {
         method: 'POST',
       })
       const data = await response.json()
@@ -219,6 +214,7 @@ export function useResearch() {
       }
 
       isIndexed.value = true
+      reportId.value = data.task_id ?? taskId.value
     } catch (e) {
       indexError.value = e instanceof Error ? e.message : '入库失败'
     } finally {

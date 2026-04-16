@@ -28,15 +28,15 @@
     <section class="flow-notes" aria-label="工作流说明">
       <div>
         <strong>1. 生成报告</strong>
-        <span>Agent 先产出待确认 Markdown。</span>
+        <span>Agent直接在页面中流式产出Markdown报告。</span>
       </div>
       <div>
         <strong>2. 确认入库</strong>
-        <span>你确认后才写入本地知识库。</span>
+        <span>确认后才写入本地知识库。</span>
       </div>
       <div>
-        <strong>3. RAG 问答</strong>
-        <span>从 Milvus 检索并流式回答。</span>
+        <strong>3. RAG问答</strong>
+        <span>从Milvus检索并流式回答。</span>
       </div>
     </section>
   </main>
@@ -55,7 +55,7 @@ const emit = defineEmits<{
 }>()
 
 const topic = ref('')
-const placeholder = '例如：\nLangChain 框架最新发展趋势\n人工智能对软件开发的影响\n某个行业政策的背景、影响与未来走向'
+const placeholder = '例如：\n杀戮尖塔2猎人该怎么玩？有什么流派？\n炫神为什么封杀切片？\n'
 
 const handleSearch = () => {
   const trimmed = topic.value.trim()

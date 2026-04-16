@@ -12,6 +12,8 @@ if project_root not in sys.path:
 import asyncio
 import uuid
 import json
+import re
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 from fastapi import FastAPI, Query
@@ -31,7 +33,6 @@ from backend.services.planning_service import get_planning_service
 from backend.services.search_service import get_search_service
 from backend.services.summarization_service import get_summarization_service
 from backend.services.reporting_service import get_reporting_service
-from backend.services.report_storage_service import get_report_storage_service
 from backend.rag.indexer import RagIndexer
 from backend.rag.qa_service import RagQAService
 
@@ -60,7 +61,6 @@ planning_service = get_planning_service()
 search_service = get_search_service()
 summarization_service = get_summarization_service()
 reporting_service = get_reporting_service()
-report_storage_service = get_report_storage_service()
 rag_indexer = RagIndexer()
 rag_qa_service = RagQAService()
 
@@ -93,6 +93,24 @@ def _format_sse_event(event_type: str, data: dict) -> str:
     """Format a SSE event."""
     import json
     return f"data: {json.dumps({'event': event_type, 'data': data})}\n\n"
+
+
+def _safe_report_stem(topic: str) -> str:
+    value = re.sub(r"[^\w\u4e00-\u9fff-]+", "_", topic).strip("_")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{timestamp}_{(value[:48] or 'research_report')}"
+
+
+def _unique_path(directory: Path, stem: str, suffix: str) -> Path:
+    path = directory / f"{stem}{suffix}"
+    if not path.exists():
+        return path
+    index = 2
+    while True:
+        candidate = directory / f"{stem}_{index}{suffix}"
+        if not candidate.exists():
+            return candidate
+        index += 1
 
 
 @app.get("/api/research/stream/{task_id}")
@@ -201,22 +219,12 @@ async def stream_research(task_id: str):
                 yield _format_sse_event("report_chunk", {"chunk": chunk})
 
             full_report = "".join(report_chunks)
-            pending_report = await report_storage_service.save_pending_report(
-                report_id=task.task_id,
-                topic=task.topic,
-                markdown=full_report,
-            )
-            yield _format_sse_event("report_saved", {
-                "report_id": pending_report.report_id,
-                "pending_path": pending_report.pending_path,
-                "indexed": False,
-            })
-
+            task.report = full_report
             task.status = "done"
             yield _format_sse_event("done", {
                 "report": full_report,
-                "report_id": pending_report.report_id,
-                "indexed": False,
+                "task_id": task.task_id,
+                "indexed": task.indexed,
             })
 
         except Exception as e:
@@ -241,28 +249,46 @@ async def get_research_status(task_id: str) -> Optional[ResearchTask]:
     return research_tasks.get(task_id)
 
 
-@app.post("/api/reports/{report_id}/confirm-index")
-async def confirm_report_index(report_id: str):
-    """Confirm a generated report and index it into the local RAG knowledge base."""
+@app.post("/api/research/{task_id}/index-report")
+async def index_research_report(task_id: str):
+    """Persist the generated report to the knowledge base and index it on demand."""
     try:
-        result = await report_storage_service.confirm_and_index_report(report_id)
-        return result.model_dump()
-    except Exception as e:
-        logger.exception("Confirm index failed: report_id=%s", report_id)
-        return {"error": str(e)}
+        task = research_tasks.get(task_id)
+        if task is None:
+            return {"error": "Task not found"}
+        if not task.report:
+            return {"error": "Report has not been generated yet"}
+        if task.indexed and task.knowledge_path and Path(task.knowledge_path).exists():
+            return {
+                "task_id": task_id,
+                "knowledge_path": task.knowledge_path,
+                "indexed_chunks": task.indexed_chunks,
+            }
 
-
-@app.post("/api/rag/index")
-async def index_knowledge_base():
-    """Index all confirmed Markdown files in the local knowledge base directory."""
-    try:
-        result = await asyncio.to_thread(
-            rag_indexer.index_directory,
-            Path(settings.KNOWLEDGE_BASE_DIR),
+        knowledge_dir = Path(settings.KNOWLEDGE_BASE_DIR)
+        knowledge_dir.mkdir(parents=True, exist_ok=True)
+        target_path = Path(task.knowledge_path) if task.knowledge_path else _unique_path(
+            knowledge_dir,
+            _safe_report_stem(task.topic),
+            ".md",
         )
-        return result
+        target_path.write_text(task.report, encoding="utf-8")
+        task.knowledge_path = str(target_path)
+
+        result = await asyncio.to_thread(
+            rag_indexer.index_file,
+            target_path,
+            task_id,
+        )
+        task.indexed = True
+        task.indexed_chunks = int(result.get("indexed_chunks") or 0)
+        return {
+            "task_id": task_id,
+            "knowledge_path": task.knowledge_path,
+            "indexed_chunks": task.indexed_chunks,
+        }
     except Exception as e:
-        logger.exception("Knowledge base indexing failed")
+        logger.exception("Index generated report failed: task_id=%s", task_id)
         return {"error": str(e)}
 
 
@@ -270,8 +296,8 @@ async def index_knowledge_base():
 async def rag_search(question: str = Query(..., min_length=1)):
     """Return raw vector search results for debugging the local RAG retrieval step."""
     try:
-        results = rag_qa_service.search(question)
-        return {"results": [result.model_dump() for result in results]}
+        trace = rag_qa_service.search(question)
+        return trace.model_dump()
     except Exception as e:
         logger.exception("RAG search failed")
         return {"error": str(e)}

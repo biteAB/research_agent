@@ -38,6 +38,10 @@ class ResearchTask(BaseModel):
     status: str = "pending"  # pending, planning, searching, summarizing, reporting, done, error
     plan: Optional[TodoPlan] = None
     summaries: List[TaskSummary] = Field(default_factory=list)
+    report: Optional[str] = None
+    indexed: bool = False
+    knowledge_path: Optional[str] = None
+    indexed_chunks: int = 0
     error: Optional[str] = None
 
 

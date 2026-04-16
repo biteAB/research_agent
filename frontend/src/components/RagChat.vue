@@ -8,11 +8,6 @@
           只检索已经确认入库的 Markdown 报告。回答会结合 Milvus 召回结果生成，并实时流式返回。
         </p>
       </div>
-      <div class="intro-notes" aria-label="RAG 使用提示">
-        <span>仅使用已入库报告</span>
-        <span>支持 Markdown 回答</span>
-        <span>当前对话不持久化</span>
-      </div>
     </section>
 
     <section class="chat-shell">
@@ -47,7 +42,7 @@
         <textarea
           id="rag-question"
           v-model="question"
-          placeholder="例如：这份报告里提到的核心争议是什么？有哪些参考来源？"
+          placeholder="例如：bin哥是谁？bin哥是不是世一上？"
           :disabled="isAnswering"
           @keydown.ctrl.enter.prevent="handleAsk"
         />
@@ -135,22 +130,6 @@ const handleAsk = () => {
   line-height: 1.7;
 }
 
-.intro-notes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.intro-notes span {
-  padding: 7px 10px;
-  background: #eef7f0;
-  border: 1px solid #d8eadc;
-  border-radius: 8px;
-  color: #2f5f3b;
-  font-size: 0.86rem;
-  white-space: nowrap;
-}
 
 .chat-shell {
   display: grid;

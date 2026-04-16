@@ -28,7 +28,8 @@ class RagIndexer:
 
     def _get_store(self) -> MilvusVectorStore:
         if self.store is None:
-            self.store = MilvusVectorStore()
+            embeddings = self._get_embeddings()
+            self.store = MilvusVectorStore(dense_dim=embeddings.dimension)
         return self.store
 
     def index_file(self, path: Path, report_id: str | None = None) -> dict:
@@ -46,20 +47,3 @@ class RagIndexer:
         inserted = self._get_store().insert_chunks(chunks, vectors)
         logger.info("Indexed file=%s domain=%s chunks=%d", path, domain, inserted)
         return {"indexed_files": 1, "indexed_chunks": inserted, "domain": domain}
-
-    def index_directory(self, directory: Path) -> dict:
-        logger.info("Indexing markdown directory: %s", directory)
-        docs = self.loader.load_directory(directory)
-
-        total_chunks = 0
-        for doc in docs:
-            chunks = self.splitter.split_document(doc)
-            if not chunks:
-                continue
-            domain = self.metadata_extractor.extract_domain(doc.document_title, doc.content)
-            chunks = [chunk.model_copy(update={"domain": domain}) for chunk in chunks]
-            vectors = self._get_embeddings().embed_documents([chunk.content for chunk in chunks])
-            total_chunks += self._get_store().insert_chunks(chunks, vectors)
-
-        logger.info("Indexed files=%d chunks=%d", len(docs), total_chunks)
-        return {"indexed_files": len(docs), "indexed_chunks": total_chunks}

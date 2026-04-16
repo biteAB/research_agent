@@ -1,11 +1,11 @@
 # 自动化深度研究Agent + 本地知识库RAG系统
 
-这是一个面向中文资料研究的多Agent项目。系统支持从用户输入主题开始，自动规划研究任务、检索外部资料、总结信息并生成 Markdown报告；报告生成后不会立即进入知识库，而是先进入待确认区，只有用户在前端点击“确认入库”后，才会写入本地Markdown 知识库并增量索引到Milvus，供RAG问答检索使用。
+这是一个面向中文资料研究的多Agent项目。系统支持从用户输入主题开始，自动规划研究任务、检索外部资料、总结信息并生成 Markdown报告；报告生成后不会自动保存到 `backend/data/pending_reports/`，只有用户在前端点击“确认入库”后，才会写入本地Markdown 知识库并增量索引到Milvus，供RAG问答检索使用。
 
 ```text
 用户输入研究主题
   -> Agent 检索与生成 Markdown 报告
-  -> 保存为待确认报告
+  -> 前端流式展示报告
   -> 用户前端确认入库
   -> 写入 backend/data/markdown
   -> Markdown 结构化切分
@@ -21,7 +21,7 @@
 
 - 多Agent深度研究：规划、搜索、总结、报告生成。
 - SSE流式输出：研究进度、最终报告、RAG回答均支持前端实时展示。
-- 用户确认入库：Agent生成的报告先进入待确认目录，用户确认后才进入知识库。
+- 用户确认入库：Agent生成的报告不会自动落盘，用户确认后才进入知识库。
 - 本地Markdown 知识库：已确认报告保存到 `backend/data/markdown/`。
 - Milvus RAG：使用本地Docker部署的Milvus存储dense/sparse向量。
 - Markdown 结构化分块：按一级标题、二级标题、参考来源章节切分。
@@ -38,7 +38,7 @@
 - Python 3.10+
 - FastAPI
 - LangChain / langchain-openai
-- Tavily 或 DuckDuckGo 搜索
+- Tavily
 - pymilvus
 - sentence-transformers
 - torch
@@ -53,8 +53,8 @@
 向量数据库：
 
 - Milvus本地Docker
-- Collection：`research_agent_chunks_v2`
-- Dense embedding：`BAAI/bge-small-zh-v1.5`
+- Collection：默认 `research_agent_chunks_v2_d768`，更换 embedding 模型时需要手动配置新的 collection 名称
+- Dense embedding：本地模型 `backend/model/nlp_gte_sentence-embedding_chinese-base`
 - Sparse/BM25：优先使用 Milvus 内置 BM25 / Function 能力
 
 ## 项目结构
@@ -70,16 +70,15 @@ research_agent/
 │   │   ├── planning_service.py
 │   │   ├── search_service.py
 │   │   ├── summarization_service.py
-│   │   ├── reporting_service.py
-│   │   └── report_storage_service.py  # 待确认报告保存、确认入库
+│   │   └── reporting_service.py
 │   ├── tools/
-│   │   └── search_tool.py             # Tavily / DuckDuckGo 搜索封装
+│   │   └── search_tool.py             # Tavily
 │   ├── rag/
 │   │   ├── schemas.py                 # RAG 数据模型
 │   │   ├── markdown_loader.py         # Markdown 加载
 │   │   ├── text_splitter.py           # Markdown 结构化切分
 │   │   ├── metadata_extractor.py      # domain 元数据提取
-│   │   ├── embeddings.py              # BGE embedding
+│   │   ├── embeddings.py              # 本地 embedding 加载与维度检测
 │   │   ├── milvus_store.py            # Milvus collection / insert / search
 │   │   ├── query_analyzer.py          # 查询分析、改写、过滤条件生成
 │   │   ├── hybrid_retriever.py        # dense + sparse + RRF 融合检索
@@ -89,8 +88,7 @@ research_agent/
 │   │   ├── qa_service.py              # RAG 问答服务
 │   │   └── prompts.py                 # RAG Prompt
 │   ├── data/
-│   │   ├── pending_reports/           # Agent 生成后待确认的报告
-│   │   └── markdown/                  # 用户确认入库后的知识库 Markdown
+│   │   └── markdown/                  # 知识库 Markdown
 │   ├── schemas.py
 │   └── config.py
 ├── frontend/
@@ -120,8 +118,10 @@ research_agent/
 当前Milvus collection名称：
 
 ```text
-research_agent_chunks_v2
+research_agent_chunks_v2_d768
 ```
+
+如果更换embedding 模型，需要同时修改 `EMBEDDING_MODEL_PATH`、`EMBEDDING_DIM` 和 `MILVUS_COLLECTION`。程序不会删除旧 collection；如果当前配置的 collection 已存在但维度不匹配，会直接报错，要求你手动指定新的collection名称。
 
 Schema：
 
@@ -131,7 +131,7 @@ doc_id         VARCHAR
 chunk_type     VARCHAR      # title / section / reference
 domain         VARCHAR      # 技术 / 金融 / 医疗 / 教育 / 政策 / 产品 / 其他
 content        VARCHAR
-dense_vector   FLOAT_VECTOR dim=512
+dense_vector   FLOAT_VECTOR dim=EMBEDDING_DIM
 sparse_vector  SPARSE_FLOAT_VECTOR
 ```
 
@@ -142,7 +142,7 @@ sparse_vector  SPARSE_FLOAT_VECTOR
 - `chunk_type`：区分标题块、正文块、参考来源块。
 - `domain`：主题领域，用于基础元数据过滤。
 - `content`：保留原始chunk文本，便于调试、引用展示和BM25 sparse检索。
-- `dense_vector`：BGE向量，用于语义召回。
+- `dense_vector`：本地 embedding 向量，用于语义召回。当前本地模型实测维度为 `768`，配置值 `EMBEDDING_DIM` 必须与实测维度一致。
 - `sparse_vector`：Milvus内置BM25 sparse向量，用于关键词召回。
 
 ## Agent与知识库入库流程
@@ -150,23 +150,25 @@ sparse_vector  SPARSE_FLOAT_VECTOR
 1. 用户在前端输入研究主题。
 2. 后端启动研究任务，通过SSE推送规划、搜索、总结、报告生成状态。
 3. Agent生成Markdown报告。
-4. 报告保存到：
+4. 报告通过SSE流式返回给前端展示，不会自动保存到：
 
 ```text
 backend/data/pending_reports/
 ```
 
 5. 前端展示“确认入库”按钮。
-6. 用户确认后，报告复制到：
+6. 用户确认后，报告写入：
 
 ```text
 backend/data/markdown/
 ```
 
-7. `RagIndexer`加载该Markdown，结构化切分、提取domain、生成dense embedding，并写入Milvus。
+7. `RagIndexer`加载该Markdown，结构化切分、提取domain、使用本地 embedding 模型生成dense向量，并写入Milvus。
 8. RAG问答页面即可检索该报告内容。
 
 也就是说：没有经过用户确认入库的报告，不会进入Milvus向量数据库。
+
+当前只保留“Agent生成报告 -> 用户确认入库”这一条入库路径，不再暴露全量扫描 `backend/data/markdown/` 的入库接口。
 
 ## RAG 检索流程
 
@@ -234,7 +236,7 @@ localhost:19530
 ```env
 MILVUS_HOST=localhost
 MILVUS_PORT=19530
-MILVUS_COLLECTION=research_agent_chunks_v2
+MILVUS_COLLECTION=research_agent_chunks_v2_d768
 ```
 
 ### 5. 配置环境变量
@@ -257,11 +259,12 @@ SEARCH_ENGINE=tavily
 # Milvus
 MILVUS_HOST=localhost
 MILVUS_PORT=19530
-MILVUS_COLLECTION=research_agent_chunks_v2
+MILVUS_COLLECTION=research_agent_chunks_v2_d768
 
 # Embedding
-EMBEDDING_MODEL_NAME=BAAI/bge-small-zh-v1.5
-EMBEDDING_DIM=512
+EMBEDDING_MODEL_NAME=nlp_gte_sentence-embedding_chinese-base
+EMBEDDING_MODEL_PATH=backend/model/nlp_gte_sentence-embedding_chinese-base
+EMBEDDING_DIM=768
 
 # RAG
 ENABLE_SPARSE_SEARCH=True
@@ -326,7 +329,7 @@ selected_context
 
 1. `/api/rag/search` 返回的 `dense_hits` 和 `sparse_hits`。
 2. `filter_expr` 是否因为 `domain` 或 `chunk_type` 过滤过严。
-3. Milvus collection是否为 `research_agent_chunks_v2`。
+3. Milvus collection是否为当前配置的 collection；如果更换 embedding 模型，需要手动指定新的 `MILVUS_COLLECTION`。
 4. 已确认入库的 Markdown 是否存在于 `backend/data/markdown/`。
 
 ## 后续迭代方向
@@ -337,4 +340,3 @@ selected_context
 - 查询改写和多轮检索增强。
 - Rerank默认可配置化与模型缓存说明。
 - RAG 聊天记录持久化。
-

@@ -4,7 +4,6 @@
       <span class="brand-mark">RA</span>
       <div>
         <strong>Research Agent</strong>
-        <span>本地知识闭环</span>
       </div>
     </div>
 

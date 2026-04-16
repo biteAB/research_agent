@@ -8,7 +8,11 @@ logger = logging.getLogger(__name__)
 
 
 class MilvusVectorStore:
-    """Create, insert into, and search a Milvus collection."""
+    """Create, insert into, and search the configured Milvus collection.
+
+    Collection selection is explicit: change MILVUS_COLLECTION when changing
+    embedding models. Existing collections are never dropped automatically.
+    """
 
     BASE_FIELDS = {
         "chunk_uid",
@@ -20,7 +24,10 @@ class MilvusVectorStore:
     }
     SPARSE_FIELDS = BASE_FIELDS | {"sparse_vector"}
 
-    def __init__(self):
+    def __init__(self, dense_dim: int):
+        if dense_dim <= 0:
+            raise ValueError(f"dense_dim must be positive, got {dense_dim}")
+
         from pymilvus import Collection, CollectionSchema, DataType, FieldSchema, connections, utility
 
         self.Collection = Collection
@@ -29,13 +36,15 @@ class MilvusVectorStore:
         self.FieldSchema = FieldSchema
         self.utility = utility
         self.collection_name = settings.MILVUS_COLLECTION
+        self.dense_dim = dense_dim
         self.sparse_enabled = False
 
         logger.info(
-            "Connecting to Milvus: host=%s port=%s collection=%s",
+            "Connecting to Milvus: host=%s port=%s collection=%s dense_dim=%d",
             settings.MILVUS_HOST,
             settings.MILVUS_PORT,
             self.collection_name,
+            self.dense_dim,
         )
         connections.connect(
             alias="default",
@@ -55,46 +64,89 @@ class MilvusVectorStore:
             return int(dim) if dim is not None else None
         return None
 
-    def _schema_matches(self) -> bool:
+    def _indexed_fields(self) -> set[str]:
+        try:
+            return {index.field_name for index in self.collection.indexes}
+        except Exception:
+            logger.debug("Unable to inspect Milvus indexes for collection=%s", self.collection_name, exc_info=True)
+            return set()
+
+    def _validate_existing_collection(self) -> None:
         field_names = self._field_names()
-        expected = self.SPARSE_FIELDS if settings.ENABLE_SPARSE_SEARCH else self.BASE_FIELDS
-        if settings.ENABLE_SPARSE_SEARCH and field_names != self.SPARSE_FIELDS:
-            logger.warning("Milvus sparse schema expected but not present: existing=%s", sorted(field_names))
-            return False
-        if not settings.ENABLE_SPARSE_SEARCH and field_names != self.BASE_FIELDS:
-            logger.warning("Milvus schema mismatch: existing=%s expected=%s", sorted(field_names), sorted(expected))
-            return False
-        if self._dense_dim() != settings.EMBEDDING_DIM:
-            logger.warning("Milvus dense dim mismatch: existing=%s expected=%s", self._dense_dim(), settings.EMBEDDING_DIM)
-            return False
-        self.sparse_enabled = "sparse_vector" in field_names
-        return True
+        if field_names not in (self.BASE_FIELDS, self.SPARSE_FIELDS):
+            raise RuntimeError(
+                "Milvus collection schema fields mismatch: "
+                f"collection={self.collection_name} existing={sorted(field_names)} "
+                f"expected={sorted(self.BASE_FIELDS)} or {sorted(self.SPARSE_FIELDS)}. "
+                "Existing collection was not dropped. Set MILVUS_COLLECTION to a new collection name if needed."
+            )
+
+        existing_dim = self._dense_dim()
+        if existing_dim != self.dense_dim:
+            raise RuntimeError(
+                "Milvus collection dense_vector dimension mismatch: "
+                f"collection={self.collection_name} existing_dim={existing_dim} expected_dim={self.dense_dim}. "
+                "Existing collection was not dropped. Change MILVUS_COLLECTION to a new collection name, "
+                "or set EMBEDDING_DIM/model path to match this collection."
+            )
+
+        indexed_fields = self._indexed_fields()
+        if "dense_vector" not in indexed_fields:
+            raise RuntimeError(
+                "Milvus collection dense index is missing: "
+                f"collection={self.collection_name} indexed_fields={sorted(indexed_fields)}. "
+                "Existing collection was not dropped. Set MILVUS_COLLECTION to a new collection name if needed."
+            )
+
+        has_sparse_field = "sparse_vector" in field_names
+        has_sparse_index = "sparse_vector" in indexed_fields
+        self.sparse_enabled = has_sparse_field and has_sparse_index
+        if has_sparse_field and not has_sparse_index:
+            logger.warning(
+                "Milvus collection=%s has sparse_vector field but no sparse index; sparse search will be disabled",
+                self.collection_name,
+            )
+        if settings.ENABLE_SPARSE_SEARCH and not self.sparse_enabled:
+            logger.warning(
+                "Milvus collection=%s is dense-only; sparse BM25 search will be disabled",
+                self.collection_name,
+            )
 
     def ensure_collection(self) -> None:
         if self.utility.has_collection(self.collection_name):
             self.collection = self.Collection(self.collection_name)
-            if self._schema_matches():
-                self.collection.load()
-                logger.info("Loaded Milvus collection=%s sparse_enabled=%s", self.collection_name, self.sparse_enabled)
-                return
-            logger.warning("Dropping and recreating Milvus collection: %s", self.collection_name)
-            try:
-                self.collection.release()
-            except Exception:
-                logger.debug("Collection release skipped before drop", exc_info=True)
-            self.utility.drop_collection(self.collection_name)
+            self._validate_existing_collection()
+            self.collection.load()
+            logger.info(
+                "Loaded Milvus collection=%s sparse_enabled=%s dense_dim=%d",
+                self.collection_name,
+                self.sparse_enabled,
+                self.dense_dim,
+            )
+            return
 
+        self._create_collection_with_sparse_fallback()
+
+    def _create_collection_with_sparse_fallback(self) -> None:
         if settings.ENABLE_SPARSE_SEARCH:
             try:
                 self._create_collection(enable_sparse=True)
                 return
             except Exception:
                 logger.exception(
-                    "Failed to create Milvus BM25 sparse collection. "
-                    "Falling back to dense-only. Upgrade Milvus/pymilvus to enable SPARSE_FLOAT_VECTOR + BM25 Function."
+                    "Failed to create Milvus BM25 sparse collection=%s. "
+                    "Falling back to dense-only without dropping any collection.",
+                    self.collection_name,
                 )
+                dense_collection_name = f"{self.collection_name}_dense"
                 if self.utility.has_collection(self.collection_name):
-                    self.utility.drop_collection(self.collection_name)
+                    self.collection_name = dense_collection_name
+                    logger.warning("Using dense-only fallback collection=%s", self.collection_name)
+                    if self.utility.has_collection(self.collection_name):
+                        self.collection = self.Collection(self.collection_name)
+                        self._validate_existing_collection()
+                        self.collection.load()
+                        return
 
         self._create_collection(enable_sparse=False)
 
@@ -113,7 +165,7 @@ class MilvusVectorStore:
             self.FieldSchema(name="chunk_type", dtype=self.DataType.VARCHAR, max_length=32),
             self.FieldSchema(name="domain", dtype=self.DataType.VARCHAR, max_length=32),
             self.FieldSchema(**content_kwargs),
-            self.FieldSchema(name="dense_vector", dtype=self.DataType.FLOAT_VECTOR, dim=settings.EMBEDDING_DIM),
+            self.FieldSchema(name="dense_vector", dtype=self.DataType.FLOAT_VECTOR, dim=self.dense_dim),
         ]
 
         if enable_sparse:
@@ -136,7 +188,12 @@ class MilvusVectorStore:
                 raise RuntimeError("Current pymilvus CollectionSchema has no add_function")
             schema.add_function(bm25_function)
 
-        logger.info("Creating Milvus collection=%s sparse=%s", self.collection_name, enable_sparse)
+        logger.info(
+            "Creating Milvus collection=%s sparse=%s dense_dim=%d",
+            self.collection_name,
+            enable_sparse,
+            self.dense_dim,
+        )
         self.collection = self.Collection(self.collection_name, schema=schema)
         self.collection.create_index(
             field_name="dense_vector",
@@ -163,10 +220,12 @@ class MilvusVectorStore:
             return 0
         if len(chunks) != len(dense_embeddings):
             raise ValueError("chunks and dense_embeddings length mismatch")
-        if dense_embeddings and len(dense_embeddings[0]) != settings.EMBEDDING_DIM:
-            raise ValueError(
-                f"Embedding dimension mismatch: expected {settings.EMBEDDING_DIM}, got {len(dense_embeddings[0])}"
-            )
+
+        for index, embedding in enumerate(dense_embeddings):
+            if len(embedding) != self.dense_dim:
+                raise ValueError(
+                    f"Embedding dimension mismatch at index={index}: expected {self.dense_dim}, got {len(embedding)}"
+                )
 
         rows = [
             {
@@ -180,7 +239,13 @@ class MilvusVectorStore:
             for chunk, dense_vector in zip(chunks, dense_embeddings)
         ]
 
-        logger.info("Inserting %d chunks into Milvus sparse_enabled=%s", len(rows), self.sparse_enabled)
+        logger.info(
+            "Inserting %d chunks into Milvus collection=%s sparse_enabled=%s dense_dim=%d",
+            len(rows),
+            self.collection_name,
+            self.sparse_enabled,
+            self.dense_dim,
+        )
         self.collection.insert(rows)
         self.collection.flush()
         return len(rows)
@@ -198,7 +263,11 @@ class MilvusVectorStore:
         )
 
     def dense_search(self, query_embedding: list[float], top_k: int, expr: str | None = None) -> list[RagSearchHit]:
-        logger.info("Dense search top_k=%d expr=%s", top_k, expr)
+        if len(query_embedding) != self.dense_dim:
+            raise ValueError(
+                f"Query embedding dimension mismatch: expected {self.dense_dim}, got {len(query_embedding)}"
+            )
+        logger.info("Dense search collection=%s top_k=%d expr=%s", self.collection_name, top_k, expr)
         results = self.collection.search(
             data=[query_embedding],
             anns_field="dense_vector",
@@ -214,7 +283,7 @@ class MilvusVectorStore:
             logger.warning("Sparse search requested but Milvus BM25 sparse collection is not enabled")
             return []
 
-        logger.info("Sparse BM25 search top_k=%d expr=%s", top_k, expr)
+        logger.info("Sparse BM25 search collection=%s top_k=%d expr=%s", self.collection_name, top_k, expr)
         results = self.collection.search(
             data=[query_text],
             anns_field="sparse_vector",

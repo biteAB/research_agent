@@ -41,7 +41,7 @@
             {{ isIndexed ? '已入库' : isIndexing ? '正在入库...' : '确认入库' }}
           </button>
           <span v-if="isIndexed" class="success-text">这份报告已进入本地知识库</span>
-          <span v-else-if="!reportId" class="muted-text">报告保存后可入库</span>
+          <span v-else-if="!reportId" class="muted-text">报告生成后可入库</span>
           <span v-if="indexError" class="error-text">{{ indexError }}</span>
         </div>
         <button class="btn-primary" @click="handleClose">完成并返回</button>

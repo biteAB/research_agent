@@ -1,6 +1,6 @@
 """Configuration settings for the research agent system."""
-from pydantic_settings import BaseSettings
 from typing import Optional
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -33,15 +33,16 @@ class Settings(BaseSettings):
 
     # Local knowledge base and RAG configuration
     DATA_DIR: str = "backend/data"
-    PENDING_REPORT_DIR: str = "backend/data/pending_reports"
     KNOWLEDGE_BASE_DIR: str = "backend/data/markdown"
 
     MILVUS_HOST: str = "localhost"
     MILVUS_PORT: int = 19530
-    MILVUS_COLLECTION: str = "research_agent_chunks_v2"
+    MILVUS_COLLECTION: str = "research_agent_chunks_v2_d768"
 
-    EMBEDDING_MODEL_NAME: str = "BAAI/bge-small-zh-v1.5"
-    EMBEDDING_DIM: int = 512
+    EMBEDDING_MODEL_NAME: str = "nlp_gte_sentence-embedding_chinese-base"
+    EMBEDDING_MODEL_PATH: str = "backend/model/nlp_gte_sentence-embedding_chinese-base"
+    # Must match the local embedding model output dimension and the Milvus dense_vector dimension.
+    EMBEDDING_DIM: int = 768
 
     RAG_CHUNK_SIZE: int = 800
     RAG_CHUNK_OVERLAP: int = 120

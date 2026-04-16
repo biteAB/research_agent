@@ -17,7 +17,7 @@ class HybridRetriever:
 
     def __init__(self):
         self.embeddings = BgeEmbeddingService()
-        self.store = MilvusVectorStore()
+        self.store = MilvusVectorStore(dense_dim=self.embeddings.dimension)
         self.query_analyzer = QueryAnalyzer()
         self.reranker = LocalReranker()
 
