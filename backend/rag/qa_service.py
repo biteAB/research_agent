@@ -1,6 +1,7 @@
 """RAG question answering service."""
 import asyncio
 import logging
+import os
 from typing import AsyncIterator
 
 from langchain_core.prompts import ChatPromptTemplate
@@ -30,9 +31,9 @@ class RagQAService:
     def _get_chain(self):
         if self.chain is None:
             self.llm = ChatOpenAI(
-                api_key=settings.get_effective_api_key(),
-                model=settings.get_effective_model(),
-                base_url=settings.get_effective_base_url(),
+                api_key=os.getenv("LLM_API_KEY"),
+                model=os.getenv("LLM_MODEL_ID"),
+                base_url=os.getenv("LLM_BASE_URL"),
                 temperature=0.3,
                 streaming=True,
             )

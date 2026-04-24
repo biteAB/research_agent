@@ -1,4 +1,5 @@
 """Reporting Service - Generates the final Markdown report with streaming."""
+import os
 from typing import AsyncIterator, List, Optional
 from langchain_openai import ChatOpenAI
 from backend.agents.reporter import create_reporter_chain, stream_report
@@ -16,9 +17,9 @@ class ReportingService:
     def _init_llm(self) -> ChatOpenAI:
         """Initialize the LLM with streaming enabled."""
         return ChatOpenAI(
-            api_key=settings.get_effective_api_key(),
-            model=settings.get_effective_model(),
-            base_url=settings.get_effective_base_url(),
+            api_key=os.getenv("LLM_API_KEY"),
+            model=os.getenv("LLM_MODEL_ID"),
+            base_url=os.getenv("LLM_BASE_URL"),
             temperature=0.6,
             streaming=True
         )

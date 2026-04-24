@@ -1,4 +1,5 @@
 """Search tool wrapper for Tavily or DuckDuckGo."""
+import os
 from typing import List, Tuple, Optional
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langchain_community.tools import DuckDuckGoSearchRun
@@ -10,16 +11,17 @@ class SearchTool:
     """Wrapper for search engine (Tavily or DuckDuckGo)."""
 
     def __init__(self):
-        self.engine = settings.SEARCH_ENGINE
+        self.engine = os.getenv("SEARCH_ENGINE", "tavily")
         self.max_results = settings.MAX_SEARCH_RESULTS
         self.max_result_length = settings.MAX_RESULT_LENGTH
 
         if self.engine == "tavily":
-            if not settings.TAVILY_API_KEY:
+            tavily_api_key = os.getenv("TAVILY_API_KEY")
+            if not tavily_api_key:
                 raise ValueError("TAVILY_API_KEY is required when using Tavily search")
             self.search = TavilySearchResults(
                 max_results=self.max_results,
-                tavily_api_key=settings.TAVILY_API_KEY
+                tavily_api_key=tavily_api_key
             )
         elif self.engine == "duckduckgo":
             self.search = DuckDuckGoSearchRun()

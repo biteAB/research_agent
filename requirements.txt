@@ -6,6 +6,7 @@ langchain-openai
 langchain-community
 openai
 pydantic-settings
+python-dotenv
 tavily-python
 python-multipart
 pymilvus

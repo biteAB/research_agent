@@ -1,4 +1,5 @@
 """Summarization Service - Summarizes search results for each task."""
+import os
 from typing import Tuple, Optional, List
 from langchain_openai import ChatOpenAI
 from backend.agents.summarizer import create_summarizer_chain
@@ -17,9 +18,9 @@ class SummarizationService:
     def _init_llm(self) -> ChatOpenAI:
         """Initialize the LLM."""
         return ChatOpenAI(
-            api_key=settings.get_effective_api_key(),
-            model=settings.get_effective_model(),
-            base_url=settings.get_effective_base_url(),
+            api_key=os.getenv("LLM_API_KEY"),
+            model=os.getenv("LLM_MODEL_ID"),
+            base_url=os.getenv("LLM_BASE_URL"),
             temperature=0.5
         )
 

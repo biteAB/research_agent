@@ -1,10 +1,11 @@
 """Planning Service - Calls TODO Planner Agent and handles retries."""
+import os
+import json
 from typing import Tuple, Optional
 from langchain_openai import ChatOpenAI
 from backend.agents.planner import create_planner_chain
 from backend.schemas import TodoPlan, TodoTask
 from backend.config import settings
-import json
 
 
 class PlanningService:
@@ -18,9 +19,9 @@ class PlanningService:
     def _init_llm(self) -> ChatOpenAI:
         """Initialize the LLM."""
         return ChatOpenAI(
-            api_key=settings.get_effective_api_key(),
-            model=settings.get_effective_model(),
-            base_url=settings.get_effective_base_url(),
+            api_key=os.getenv("LLM_API_KEY"),
+            model=os.getenv("LLM_MODEL_ID"),
+            base_url=os.getenv("LLM_BASE_URL"),
             temperature=0.7
         )
 
